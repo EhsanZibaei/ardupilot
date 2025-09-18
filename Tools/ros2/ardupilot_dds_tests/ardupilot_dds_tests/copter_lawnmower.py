@@ -36,7 +36,7 @@ from ardupilot_msgs.srv import Takeoff
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
-TAKEOFF_ALT = 10.5  # meters
+TAKEOFF_ALT = 595.0  # meters
 
 
 class CopterLawnmower(Node):
@@ -205,29 +205,24 @@ class CopterLawnmower(Node):
         num_passes = int(height_m / spacing_m) + 1
         
         for i in range(num_passes):
-            y_offset = i * spacing_m * lat_deg_per_m
+            # Vertical offset (north/south)
+            y_offset = -i * spacing_m * lat_deg_per_m
             
-            if i % 2 == 0:  # Even passes: left to right
-                # Start point of this pass
-                lat = start_lat + y_offset
-                lon = start_lon
-                waypoints.append(self.create_waypoint(lat, lon, altitude))
-                
-                # End point of this pass
-                lat = start_lat + y_offset
-                lon = start_lon + width_m * lon_deg_per_m
-                waypoints.append(self.create_waypoint(lat, lon, altitude))
-                
-            else:  # Odd passes: right to left
-                # Start point of this pass
-                lat = start_lat + y_offset
-                lon = start_lon + width_m * lon_deg_per_m
-                waypoints.append(self.create_waypoint(lat, lon, altitude))
-                
-                # End point of this pass
-                lat = start_lat + y_offset
-                lon = start_lon
-                waypoints.append(self.create_waypoint(lat, lon, altitude))
+            # Horizontal offsets (east/west)
+            x_start = 0                  # start at left (relative)
+            x_end = width_m * lon_deg_per_m  # end at right (relative)
+            
+            # Alternate direction for each pass
+            if i % 2 == 0:  # Even pass: left to right
+                start_x, end_x = x_start, x_end
+            else:           # Odd pass: right to left
+                start_x, end_x = x_end, x_start
+            
+            # Compute waypoints
+            lat = start_lat + y_offset
+            waypoints.append(self.create_waypoint(lat, start_lon + start_x, altitude))
+            waypoints.append(self.create_waypoint(lat, start_lon + end_x, altitude))
+
         
         return waypoints
 
@@ -307,8 +302,8 @@ def main(args=None):
         # spacing_m: distance between parallel lines in meters
         success = node.execute_lawnmower_pattern(
             start_lat, start_lon, 
-            width_m=40,     # 40 meter wide area
-            height_m=40,    # 40 meter long area
+            width_m=80,     # 40 meter wide area
+            height_m=80,    # 40 meter long area
             spacing_m=8     # 8 meter spacing between lines
         )
         
