@@ -32,7 +32,7 @@ from geopy import point
 from ardupilot_msgs.srv import ArmMotors
 from ardupilot_msgs.srv import ModeSwitch
 from ardupilot_msgs.srv import Takeoff
-
+from object_detector_msgs.msg import ObjectDetection
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
@@ -90,8 +90,8 @@ class CopterLawnmower(Node):
         self.camel_detected = False
         self.camel_position = None
         self.create_subscription(
-            CamelDetectionMsg,  
-            "/camel_detection", 
+            ObjectDetection,  
+            "/object_detection", 
             self.camel_callback,
             10
         )
@@ -257,13 +257,16 @@ class CopterLawnmower(Node):
             self.send_goal_position(waypoint)
 
             # Keep monitoring while flying to this waypoint
-            while not self.wait_for_waypoint(waypoint, timeout=1.0):
+            while not self.wait_for_waypoint(waypoint):
                 if self.camel_detected and self.camel_position is not None:
                     self.handle_camel_event(current_alt)
                     self.camel_detected = False  # reset flag
                     # after camel event, retry same waypoint
                     self.send_goal_position(waypoint)
 
+            # if not self.wait_for_waypoint(waypoint):
+            #     self.get_logger().error(f"Failed to reach waypoint {i+1}")
+            #     return False
             self.get_logger().info(f"Reached waypoint {i+1}")
             i += 1
         
@@ -338,7 +341,7 @@ def main(args=None):
             start_lat, start_lon, 
             width_m=80,     # 40 meter wide area
             height_m=80,    # 40 meter long area
-            spacing_m=8     # 8 meter spacing between lines
+            spacing_m=16     # 8 meter spacing between lines
         )
         
         if success:
