@@ -33,6 +33,7 @@ from ardupilot_msgs.srv import ArmMotors
 from ardupilot_msgs.srv import ModeSwitch
 from ardupilot_msgs.srv import Takeoff
 from object_detector_msgs.msg import ObjectDetection
+import queue
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
@@ -95,6 +96,9 @@ class CopterLawnmower(Node):
             self.camel_callback,
             10
         )
+
+        self._waypoints = queue.Queue()
+        self._objects = queue.Queue()
 
     def geopose_cb(self, msg: GeoPoseStamped):
         """Process a GeoPose message."""
@@ -203,10 +207,13 @@ class CopterLawnmower(Node):
         
         return False
 
+    
+
     def generate_lawnmower_pattern(self, start_lat, start_lon, width_m, height_m, spacing_m, altitude):
         """Generate lawnmower pattern waypoints."""
         waypoints = []
-        
+        q = queue.Queue()
+
         # Calculate approximate degree per meter at this latitude
         lat_deg_per_m = 1.0 / 111320.0  # approximately constant
         lon_deg_per_m = 1.0 / (111320.0 * math.cos(math.radians(start_lat)))
@@ -230,11 +237,15 @@ class CopterLawnmower(Node):
             
             # Compute waypoints
             lat = start_lat + y_offset
-            waypoints.append(self.create_waypoint(lat, start_lon + start_x, altitude))
-            waypoints.append(self.create_waypoint(lat, start_lon + end_x, altitude))
+            wp1 = self.create_waypoint(lat, start_lon + start_x, altitude)
+            wp2 = self.create_waypoint(lat, start_lon + end_x, altitude)
+            # waypoints.append(wp1)
+            # waypoints.append(wp2)
+            q.put(wp1)
+            q.put(wp2)
 
         
-        return waypoints
+        return q
 
     def execute_lawnmower_pattern(self, start_lat, start_lon, width_m=50, height_m=50, spacing_m=10):
         """Execute a lawnmower pattern, but divert if camel detected anytime."""
@@ -244,25 +255,28 @@ class CopterLawnmower(Node):
         if current_alt < 5:
             current_alt = TAKEOFF_ALT
             
-        waypoints = self.generate_lawnmower_pattern(
+        self._waypoints = self.generate_lawnmower_pattern(
             start_lat, start_lon, width_m, height_m, spacing_m, current_alt
         )
         
-        self.get_logger().info(f"Generated {len(waypoints)} waypoints")
+        self.get_logger().info(f"Generated {self._waypoints.qsize()} waypoints")
         
         i = 0
-        while i < len(waypoints):
-            waypoint = waypoints[i]
-            self.get_logger().info(f"Flying to waypoint {i+1}/{len(waypoints)}")
+        while not self._waypoints.empty():
+            waypoint = self._waypoints.get()
+            self.get_logger().info(f"Flying to waypoint {i+1}/{self._waypoints.qsize()}")
             self.send_goal_position(waypoint)
 
+            while not self._objects.empty():
+                object = self._objects.get()
+                object_pos = self.create_waypoint(*object["position"])
+                self.get_logger().info(f"Flying to object")
+                self.send_goal_position(object_pos)
+                self.wait_for_waypoint(object_pos)
+
             # Keep monitoring while flying to this waypoint
-            while not self.wait_for_waypoint(waypoint):
-                if self.camel_detected and self.camel_position is not None:
-                    self.handle_camel_event(current_alt)
-                    self.camel_detected = False  # reset flag
-                    # after camel event, retry same waypoint
-                    self.send_goal_position(waypoint)
+            self.wait_for_waypoint(waypoint)
+
 
             # if not self.wait_for_waypoint(waypoint):
             #     self.get_logger().error(f"Failed to reach waypoint {i+1}")
@@ -275,9 +289,43 @@ class CopterLawnmower(Node):
 
     def camel_callback(self, msg):
         """Triggered when a camel is detected."""
-        self.get_logger().info("Camel detected! Switching mission...")
-        self.camel_detected = True
-        self.camel_position = (msg.latitude, msg.longitude) 
+        self.get_logger().info("Object detected! Switching mission...")
+        self.object_detected = True
+        object_detected = (msg.latitude, msg.longitude, msg.altitude)
+        self.update_object_list(object_detected)
+
+
+        
+    def update_object_list(self, object_detected):
+        temp_list = []
+
+        # Drain queue into a temp list
+        while not self._objects.empty():
+            temp_list.append(self._objects.get())
+
+        # Check if already in list (within 2m)
+        for obj in temp_list:
+            if distance.distance(obj["position"][:2], object_detected[:2]).m < 5:
+                # Put everything back before returning
+                for o in temp_list:
+                    self._objects.put(o)
+                return  
+
+        # Assign new ID
+        new_id = len(temp_list) + 1
+        temp_list.append({
+            "id": new_id,
+            "position": object_detected,
+            "visited": False
+        })
+        self.get_logger().info(f"Added a new object ('id': {new_id}, \
+            'position': {object_detected}, \
+            'visited': {False})")
+
+        # Refill the queue
+        for o in temp_list:
+            self._objects.put(o)
+
 
     def handle_camel_event(self, altitude):
         """Fly to camel, circle/loiter for a few seconds, then resume mission."""
