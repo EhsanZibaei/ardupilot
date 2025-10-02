@@ -309,6 +309,9 @@ class MAVProxyLaunch:
             f"--master {master} ",
             f"--sitl {sitl} ",
             "--non-interactive ",
+            "--cmd 'rc 6 1500' ",
+            "--cmd 'rc 7 1500' ",
+            "--cmd 'rc 8 1500' ",
         ]
 
         if console == TRUE_STRING:
