@@ -182,7 +182,7 @@ class CopterLawnmower(Node):
         waypoint.header.stamp = self.get_clock().now().to_msg()
         return waypoint
 
-    def achieved_goal(self, goal_global_pos, cur_geopose, tolerance=5.0):
+    def achieved_goal(self, goal_global_pos, cur_geopose, tolerance=0.25):
         """Return true if the current position is close enough to the goal."""
         if not cur_geopose.header.stamp.sec:
             return False
@@ -249,7 +249,7 @@ class CopterLawnmower(Node):
         
         return q
 
-    def execute_lawnmower_pattern(self, start_lat, start_lon, width_m=50, height_m=50, spacing_m=10):
+    def execute_lawnmower_pattern(self, start_lat, start_lon, width_m=55, height_m=55, spacing_m=10):
         """Execute a lawnmower pattern, but divert if camel detected anytime."""
         self.get_logger().info("Generating lawnmower pattern...")
         
@@ -270,7 +270,7 @@ class CopterLawnmower(Node):
             while not self._objects_queue.empty():
                 object = self._objects_queue.get()
                 obj_id, obj_data = list(object.items())[0]
-                object_pos = self.create_waypoint(*obj_data["position"])
+                object_pos = self.create_waypoint(*obj_data["position"][:2],15.0)
                 self.get_logger().info(f"Flying to object")
                 self.send_goal_position(object_pos)
                 if self.wait_for_waypoint(object_pos):
