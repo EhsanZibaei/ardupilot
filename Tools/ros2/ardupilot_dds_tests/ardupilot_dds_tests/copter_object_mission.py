@@ -37,7 +37,7 @@ import queue
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
-TAKEOFF_ALT = 595.0  # meters
+TAKEOFF_ALT = 15.0  # meters
 
 
 class CopterLawnmower(Node):

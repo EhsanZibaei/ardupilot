@@ -590,7 +590,7 @@ class SITLLaunch:
             ),
             DeclareLaunchArgument(
                 "home",
-                default_value="",
+                default_value="24.26,46.58,10,0",
                 description="Set start location (lat,lng,alt,yaw) or location name.",
             ),
             DeclareLaunchArgument(
