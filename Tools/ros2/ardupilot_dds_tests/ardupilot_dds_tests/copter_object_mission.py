@@ -37,7 +37,7 @@ import queue
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
-TAKEOFF_ALT = 15.0  # meters
+TAKEOFF_ALT = 25.0  # meters
 
 
 class CopterLawnmower(Node):
@@ -98,7 +98,9 @@ class CopterLawnmower(Node):
         )
 
         self._waypoints = queue.Queue()
-        self._objects = queue.Queue()
+        self._objects_history = {}
+        self._objects_queue = queue.Queue()
+
 
     def geopose_cb(self, msg: GeoPoseStamped):
         """Process a GeoPose message."""
@@ -263,18 +265,23 @@ class CopterLawnmower(Node):
         
         i = 0
         while not self._waypoints.empty():
+            
+
+            while not self._objects_queue.empty():
+                object = self._objects_queue.get()
+                obj_id, obj_data = list(object.items())[0]
+                object_pos = self.create_waypoint(*obj_data["position"])
+                self.get_logger().info(f"Flying to object")
+                self.send_goal_position(object_pos)
+                if self.wait_for_waypoint(object_pos):
+                    self._objects_history[obj_id]["visited"] = True
+
+
+
+            # Keep monitoring while flying to this waypoint
             waypoint = self._waypoints.get()
             self.get_logger().info(f"Flying to waypoint {i+1}/{self._waypoints.qsize()}")
             self.send_goal_position(waypoint)
-
-            while not self._objects.empty():
-                object = self._objects.get()
-                object_pos = self.create_waypoint(*object["position"])
-                self.get_logger().info(f"Flying to object")
-                self.send_goal_position(object_pos)
-                self.wait_for_waypoint(object_pos)
-
-            # Keep monitoring while flying to this waypoint
             self.wait_for_waypoint(waypoint)
 
 
@@ -297,34 +304,32 @@ class CopterLawnmower(Node):
 
         
     def update_object_list(self, object_detected):
-        temp_list = []
-
-        # Drain queue into a temp list
-        while not self._objects.empty():
-            temp_list.append(self._objects.get())
-
         # Check if already in list (within 2m)
-        for obj in temp_list:
+        
+        for obj in self._objects_history.values():
             if distance.distance(obj["position"][:2], object_detected[:2]).m < 5:
-                # Put everything back before returning
-                for o in temp_list:
-                    self._objects.put(o)
                 return  
 
         # Assign new ID
-        new_id = len(temp_list) + 1
-        temp_list.append({
-            "id": new_id,
+        new_id = len(self._objects_history) + 1
+        self._objects_history.update({
+            new_id:{
             "position": object_detected,
             "visited": False
+            }
         })
+
+        self._objects_queue.put({
+            new_id:{
+            "position": object_detected,
+            "visited": False
+            }
+        })
+
+
         self.get_logger().info(f"Added a new object ('id': {new_id}, \
             'position': {object_detected}, \
             'visited': {False})")
-
-        # Refill the queue
-        for o in temp_list:
-            self._objects.put(o)
 
 
     def handle_camel_event(self, altitude):

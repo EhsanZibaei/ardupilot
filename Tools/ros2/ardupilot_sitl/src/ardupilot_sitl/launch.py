@@ -310,7 +310,7 @@ class MAVProxyLaunch:
             f"--sitl {sitl} ",
             "--non-interactive ",
             "--cmd 'rc 6 1500' ",
-            "--cmd 'rc 7 1500' ",
+            "--cmd 'rc 7 1300' ",
             "--cmd 'rc 8 1500' ",
         ]
 
