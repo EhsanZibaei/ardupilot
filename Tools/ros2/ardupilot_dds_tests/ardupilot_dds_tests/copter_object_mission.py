@@ -37,16 +37,14 @@ import queue
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
-TAKEOFF_ALT = 25.0  # meters
-
-
-class CopterLawnmower(Node):
+TAKEOFF_ALT = 25.0
+class CopterObjectMission(Node):
     """Copter takeoff and lawnmower pattern using guided control."""
 
     def __init__(self):
         """Initialise the node."""
-        super().__init__("copter_lawnmower")
-
+        super().__init__("copter_object_mission")
+  # meters
         # Setup arm service
         self.declare_parameter("arm_topic", "/ap/arm_motors")
         self._arm_topic = self.get_parameter("arm_topic").get_parameter_value().string_value
@@ -249,7 +247,7 @@ class CopterLawnmower(Node):
         
         return q
 
-    def execute_lawnmower_pattern(self, start_lat, start_lon, width_m=55, height_m=55, spacing_m=10):
+    def execute_lawnmower_pattern(self, start_lat, start_lon, width_m=65, height_m=65, spacing_m=10):
         """Execute a lawnmower pattern, but divert if camel detected anytime."""
         self.get_logger().info("Generating lawnmower pattern...")
         
@@ -348,8 +346,9 @@ class CopterLawnmower(Node):
 
 def main(args=None):
     """Node entry point."""
+
     rclpy.init(args=args)
-    node = CopterLawnmower()
+    node = CopterObjectMission()
     
     try:
         # Switch to guided mode
@@ -392,8 +391,8 @@ def main(args=None):
         # spacing_m: distance between parallel lines in meters
         success = node.execute_lawnmower_pattern(
             start_lat, start_lon, 
-            width_m=80,     # 40 meter wide area
-            height_m=80,    # 40 meter long area
+            width_m=90,     # 40 meter wide area
+            height_m=90,    # 40 meter long area
             spacing_m=16     # 8 meter spacing between lines
         )
         
