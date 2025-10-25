@@ -37,7 +37,7 @@ import queue
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
-TAKEOFF_ALT = 25.0
+TAKEOFF_ALT = 15.0
 class CopterObjectMission(Node):
     """Copter takeoff and lawnmower pattern using guided control."""
 
@@ -194,7 +194,7 @@ class CopterObjectMission(Node):
         self.get_logger().info(f"Goal is {euclidian_distance:.2f} meters away")
         return euclidian_distance < tolerance
 
-    def wait_for_waypoint(self, waypoint, timeout_sec=60):
+    def wait_for_waypoint(self, waypoint, timeout_sec=30):
         """Wait for the copter to reach a waypoint."""
         start = self.get_clock().now()
         timeout = rclpy.duration.Duration(seconds=timeout_sec)
