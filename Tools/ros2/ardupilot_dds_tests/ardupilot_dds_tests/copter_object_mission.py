@@ -37,7 +37,7 @@ import queue
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
-TAKEOFF_ALT = 15.0
+TAKEOFF_ALT = 25.0
 class CopterObjectMission(Node):
     """Copter takeoff and lawnmower pattern using guided control."""
 
@@ -268,7 +268,7 @@ class CopterObjectMission(Node):
             while not self._objects_queue.empty():
                 object = self._objects_queue.get()
                 obj_id, obj_data = list(object.items())[0]
-                object_pos = self.create_waypoint(*obj_data["position"][:2],15.0)
+                object_pos = self.create_waypoint(*obj_data["position"][:2],13.0)
                 self.get_logger().info(f"Flying to object")
                 self.send_goal_position(object_pos)
                 if self.wait_for_waypoint(object_pos):
