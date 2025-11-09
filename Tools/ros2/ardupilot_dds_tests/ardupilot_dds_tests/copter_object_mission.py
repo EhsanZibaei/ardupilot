@@ -37,7 +37,8 @@ import queue
 
 COPTER_MODE_GUIDED = 4
 FRAME_GLOBAL_INT = 5
-TAKEOFF_ALT = 25.0
+COPTER_MODE_LAND = 9
+TAKEOFF_ALT = 45.0
 class CopterObjectMission(Node):
     """Copter takeoff and lawnmower pattern using guided control."""
 
@@ -104,7 +105,7 @@ class CopterObjectMission(Node):
         """Process a GeoPose message."""
         stamp = msg.header.stamp
         if stamp.sec:
-            self.get_logger().info("From AP : Geopose [sec:{}, nsec: {}]".format(stamp.sec, stamp.nanosec))
+            # self.get_logger().info("From AP : Geopose [sec:{}, nsec: {}]".format(stamp.sec, stamp.nanosec))
             self._cur_geopose = msg
 
     def arm(self):
@@ -191,7 +192,9 @@ class CopterObjectMission(Node):
 
         flat_distance = distance.distance(p1[:2], p2[:2]).m
         euclidian_distance = math.sqrt(flat_distance**2 + (p2[2] - p1[2]) ** 2)
-        self.get_logger().info(f"Goal is {euclidian_distance:.2f} meters away")
+        if euclidian_distance<tolerance:
+            self.get_logger().info(f"Goal is {euclidian_distance:.2f} meters away")
+            self.get_logger().info(f"Arrived at the desired waypoint")
         return euclidian_distance < tolerance
 
     def wait_for_waypoint(self, waypoint, timeout_sec=30):
@@ -260,7 +263,7 @@ class CopterObjectMission(Node):
         )
         
         self.get_logger().info(f"Generated {self._waypoints.qsize()} waypoints")
-        
+        number_of_waypoints = self._waypoints.qsize()
         i = 0
         while not self._waypoints.empty():
             
@@ -268,17 +271,20 @@ class CopterObjectMission(Node):
             while not self._objects_queue.empty():
                 object = self._objects_queue.get()
                 obj_id, obj_data = list(object.items())[0]
-                object_pos = self.create_waypoint(*obj_data["position"][:2],13.0)
+                pos = obj_data["position"]
+                object_pos = self.create_waypoint(pos[0], pos[1], pos[2] + 2)
                 self.get_logger().info(f"Flying to object")
                 self.send_goal_position(object_pos)
                 if self.wait_for_waypoint(object_pos):
                     self._objects_history[obj_id]["visited"] = True
+                    self.get_logger().info(f"list of objects: \n {self._objects_history}")
+
 
 
 
             # Keep monitoring while flying to this waypoint
             waypoint = self._waypoints.get()
-            self.get_logger().info(f"Flying to waypoint {i+1}/{self._waypoints.qsize()}")
+            self.get_logger().info(f"Flying to waypoint {i+1}/{number_of_waypoints}")
             self.send_goal_position(waypoint)
             self.wait_for_waypoint(waypoint)
 
@@ -290,11 +296,12 @@ class CopterObjectMission(Node):
             i += 1
         
         self.get_logger().info("Lawnmower pattern completed!")
+            
         return True
 
     def camel_callback(self, msg):
         """Triggered when a camel is detected."""
-        self.get_logger().info("Object detected! Switching mission...")
+        # self.get_logger().info("Object detected! Switching mission...")
         self.object_detected = True
         object_detected = (msg.latitude, msg.longitude, msg.altitude)
         self.update_object_list(object_detected)
@@ -305,7 +312,7 @@ class CopterObjectMission(Node):
         # Check if already in list (within 2m)
         
         for obj in self._objects_history.values():
-            if distance.distance(obj["position"][:2], object_detected[:2]).m < 5:
+            if distance.distance(obj["position"][:2], object_detected[:2]).m < 10:
                 return  
 
         # Assign new ID
