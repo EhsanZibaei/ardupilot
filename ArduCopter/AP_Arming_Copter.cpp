@@ -79,11 +79,12 @@ bool AP_Arming_Copter::run_pre_arm_checks(bool display_failure)
         & gcs_failsafe_check(display_failure)
         & winch_checks(display_failure)
         & rc_throttle_failsafe_checks(display_failure)
-        & alt_checks(display_failure)
+        
 #if AP_AIRSPEED_ENABLED
         & AP_Arming::airspeed_checks(display_failure)
 #endif
-        & AP_Arming::pre_arm_checks(display_failure);
+        & alt_checks(display_failure);
+        // & AP_Arming::pre_arm_checks(display_failure);
 }
 
 bool AP_Arming_Copter::rc_throttle_failsafe_checks(bool display_failure) const
